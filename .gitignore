@@ -1,0 +1,32 @@
+# Compiled object files
+*.o
+*.obj
+
+# Executables
+I2CTest
+RobotTest
+SimpleMotorTest
+StopRobot
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Debug files
+*.dSYM/
+*.su
+
+# Editor/IDE files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
