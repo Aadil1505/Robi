@@ -11,8 +11,20 @@ typedef enum {
     RIGHT = 0
 } ServoPosition;
 
+typedef struct {
+    float left;
+    float center;
+    float right;
+    int ready;
+} ScanResult;
+
 int initServo(void);
+int startServoThread(void);
+void stopServoThread(void);
 void setServoAngle(int angle);
+void setServoAngleAsync(int angle);
+void requestScan(void);
+int getScanResult(ScanResult *result);
 int findBestDirection(float *left_dist, float *center_dist, float *right_dist);
 
 #endif

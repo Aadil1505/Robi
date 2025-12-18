@@ -4,28 +4,30 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+#include <pthread.h>
 
 #define OBSTACLE_THRESHOLD 20.0
 #define SPEED 80
 #define BACKUP_TIME 500000
-#define TURN_TIME 505000        // Calibrated 90-degree turn time
-#define SENSOR_DELAY 100000
+#define TURN_TIME 505000
+#define LOOP_DELAY_US 100000
 
-volatile int keep_running = 1;
+static volatile int keep_running = 1;
+static pthread_mutex_t state_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void signal_handler(int sig) {
     printf("\nStopping robot...\n");
+    pthread_mutex_lock(&state_mutex);
     keep_running = 0;
+    pthread_mutex_unlock(&state_mutex);
 }
 
 int main(void) {
-    float distance, left_dist, right_dist;
-
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    printf("Simple Obstacle Avoidance Robot\n");
-    printf("================================\n\n");
+    printf("Multithreaded Obstacle Avoidance Robot\n");
+    printf("=======================================\n\n");
 
     initRobot();
 
@@ -42,63 +44,74 @@ int main(void) {
         return 1;
     }
 
-    // Set servo to forward position at start
+    printf("Starting sensor thread...\n");
+    if (startSensorThread() < 0) {
+        fprintf(stderr, "Failed to start sensor thread\n");
+        closeSensor();
+        i2cClose();
+        return 1;
+    }
+
+    printf("Starting servo thread...\n");
+    if (startServoThread() < 0) {
+        fprintf(stderr, "Failed to start servo thread\n");
+        stopSensorThread();
+        closeSensor();
+        i2cClose();
+        return 1;
+    }
+
     printf("Setting servo to forward position...\n");
     setServoAngle(CENTER);
     printf("Press Ctrl+C to stop\n\n");
 
-    while (keep_running) {
-        distance = getDistance();
+    usleep(500000);
+
+    while (1) {
+        pthread_mutex_lock(&state_mutex);
+        int running = keep_running;
+        pthread_mutex_unlock(&state_mutex);
+
+        if (!running) break;
+
+        float distance = getDistance();
 
         if (distance < 0) {
-            printf("Sensor error\n");
-            usleep(SENSOR_DELAY);
+            usleep(LOOP_DELAY_US);
             continue;
         }
 
         printf("Forward: %.2f cm\n", distance);
 
-        // Path is clear, keep moving forward
         if (distance > OBSTACLE_THRESHOLD) {
             moveForward(SPEED);
-            usleep(SENSOR_DELAY);
-        }
-        // Obstacle detected - scan left and right
-        else {
-            printf("Obstacle ahead! Scanning left and right...\n");
+            usleep(LOOP_DELAY_US);
+        } else {
+            printf("Obstacle ahead! Scanning...\n");
             stopRobot();
-            usleep(300000);
 
-            // Scan LEFT 
-            setServoAngle(LEFT);
-            usleep(300000);
-            left_dist = getDistance();
-            printf("  Left: %.2f cm\n", left_dist);
+            requestScan();
 
-            // Scan RIGHT 
-            setServoAngle(RIGHT);
-            usleep(300000);
-            right_dist = getDistance();
-            printf("  Right: %.2f cm\n", right_dist);
+            ScanResult scan;
+            while (!getScanResult(&scan)) {
+                usleep(100000);
+            }
 
-            // Reset servo to forward
-            setServoAngle(CENTER);
+            printf("  Left: %.2f cm\n", scan.left);
+            printf("  Center: %.2f cm\n", scan.center);
+            printf("  Right: %.2f cm\n", scan.right);
 
-            // Decide which way to turn
-            if (left_dist > right_dist && left_dist > OBSTACLE_THRESHOLD) {
-                printf("Turning left (%.2f cm)\n", left_dist);
+            if (scan.left > scan.right && scan.left > OBSTACLE_THRESHOLD) {
+                printf("Turning left (%.2f cm)\n", scan.left);
                 turnLeft(SPEED);
                 usleep(TURN_TIME);
                 stopRobot();
-            }
-            else if (right_dist > left_dist && right_dist > OBSTACLE_THRESHOLD) {
-                printf("Turning right (%.2f cm)\n", right_dist);
+            } else if (scan.right > scan.left && scan.right > OBSTACLE_THRESHOLD) {
+                printf("Turning right (%.2f cm)\n", scan.right);
                 turnRight(SPEED);
                 usleep(TURN_TIME);
                 stopRobot();
-            }
-            // Both sides blocked - backup and try again
-            else {
+            } else {
                 printf("Both sides blocked - backing up\n");
                 moveBackward(SPEED);
                 usleep(BACKUP_TIME);
@@ -109,8 +122,11 @@ int main(void) {
         }
     }
 
+    printf("\nShutting down threads...\n");
     stopRobot();
     setServoAngle(CENTER);
+    stopServoThread();
+    stopSensorThread();
     closeSensor();
     i2cClose();
     printf("Shutdown complete\n");

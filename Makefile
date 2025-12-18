@@ -1,12 +1,12 @@
 CC = gcc
 CFLAGS = -Wall -O2
-LDFLAGS = -lm -llgpio
+LDFLAGS = -lm -llgpio -pthread
 
 COMMON_OBJS = I2C.o PWM.o MotorHat.o Robot.o
 SENSOR_OBJS = Sensor.o
 SERVO_OBJS = Servo.o
 
-all: RobotTest SensorTest ServoTest ObstacleAvoidance
+all: RobotTest SensorTest ServoTest ObstacleAvoidance ThreadDemo KeyboardControl
 
 RobotTest: $(COMMON_OBJS) RobotTest.o
 	$(CC) $^ -o $@ $(LDFLAGS)
@@ -23,11 +23,17 @@ ServoAngleTest: $(COMMON_OBJS) $(SENSOR_OBJS) $(SERVO_OBJS) ServoAngleTest.o
 ObstacleAvoidance: $(COMMON_OBJS) $(SENSOR_OBJS) $(SERVO_OBJS) ObstacleAvoidance.o
 	$(CC) $^ -o $@ $(LDFLAGS)
 
+ThreadDemo: $(COMMON_OBJS) $(SENSOR_OBJS) $(SERVO_OBJS) ThreadDemo.o
+	$(CC) $^ -o $@ $(LDFLAGS)
+
+KeyboardControl: $(COMMON_OBJS) $(SENSOR_OBJS) $(SERVO_OBJS) KeyboardControl.o
+	$(CC) $^ -o $@ $(LDFLAGS) -lncurses
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f *.o RobotTest SensorTest ServoTest ServoAngleTest ObstacleAvoidance
+	rm -f *.o RobotTest SensorTest ServoTest ServoAngleTest ObstacleAvoidance ThreadDemo KeyboardControl
 
 run-robot: RobotTest
 	sudo ./RobotTest
@@ -41,4 +47,10 @@ run-servo: ServoTest
 run-avoidance: ObstacleAvoidance
 	sudo ./ObstacleAvoidance
 
-.PHONY: all clean run-robot run-sensor run-servo run-avoidance
+run-demo: ThreadDemo
+	sudo ./ThreadDemo
+
+run-keyboard: KeyboardControl
+	sudo ./KeyboardControl
+
+.PHONY: all clean run-robot run-sensor run-servo run-avoidance run-demo run-keyboard

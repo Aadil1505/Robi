@@ -1,7 +1,7 @@
 #include "Robot.h"
 
 // Speed offset to compensate for slower left wheels
-#define LEFT_WHEEL_OFFSET 40
+#define LEFT_WHEEL_OFFSET 80
 
 void initRobot(void) {
     initHat();
@@ -9,9 +9,9 @@ void initRobot(void) {
 
 void moveForward(int speed) {
     setSpeed(0, speed);
-    setSpeed(1, speed + LEFT_WHEEL_OFFSET);
+    setSpeed(1, speed);
     setSpeed(2, speed);
-    setSpeed(3, speed + LEFT_WHEEL_OFFSET);
+    setSpeed(3, speed);
 
     run(0, BACKWARD);
     run(1, FORWARD);
@@ -21,9 +21,9 @@ void moveForward(int speed) {
 
 void moveBackward(int speed) {
     setSpeed(0, speed);
-    setSpeed(1, speed + LEFT_WHEEL_OFFSET);
+    setSpeed(1, speed);
     setSpeed(2, speed);
-    setSpeed(3, speed + LEFT_WHEEL_OFFSET);
+    setSpeed(3, speed);
 
     run(0, FORWARD);
     run(1, BACKWARD);
